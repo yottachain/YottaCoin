@@ -34,8 +34,8 @@ contract YottaCoin {
         uint256 balAdmin = balances[admin];
         balances[newAdmin] = balances[newAdmin].add(balAdmin);
         balances[admin] = 0;
-        admin = newAdmin;
         emit Transfer(admin, newAdmin, balAdmin);
+        admin = newAdmin;
         return true;
     }
 
