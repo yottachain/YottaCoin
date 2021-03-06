@@ -510,7 +510,7 @@ contract YottaCoin {
         return validator.validate(_target);
     }
 
-    function withdraw(address _t0, uint256 _value) public returns (bool) {
+    function withdraw(address _to, uint256 _value) public returns (bool) {
         require(msg.sender == admin);
         require(!chainMapping);
         require(balances[address(this)].sub(_value) >= 0);
