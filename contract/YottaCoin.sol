@@ -89,6 +89,7 @@ library FrozenChecker {
         if (block.timestamp >= self.timeT.add(self.periods[self.periods.length.sub(1)])) {
             return totalFrozenValue.sub(totalFrozenValue.mul(self.percents[self.periods.length.sub(1)]).div(100));
         }
+        return 0;
     }
 
 }
@@ -251,6 +252,7 @@ contract YottaCoin {
     event Transfer(address indexed from, address indexed to, uint256 value);
     event Mint(address indexed target, uint256 value);
     event Burn(address indexed target, uint256 value);
+    event ChainMapping(address indexed target, uint256 value);
 
     // constructor
     constructor(string memory tokenName, string memory tokenSymbol, uint8 tokenDecimals) {
@@ -259,8 +261,6 @@ contract YottaCoin {
         decimals = tokenDecimals;
         totalSupply = 0;
         admin = msg.sender;
-        // balances[msg.sender] = 0;
-        // emit Transfer(address(0x0), msg.sender, totalTokenSupply);
     }
 
     //--------------------------  Events & Constructor  ------------------------------//
@@ -270,16 +270,19 @@ contract YottaCoin {
     
     function mint(address target, uint256 value) public returns (bool) {
         require(msg.sender == admin);
+        require(!chainMapping);
         require(!frozenAccount[target]);
         require(block.timestamp > frozenTimestamp[target]);
         balances[target] = balances[target].add(value);
         totalSupply = totalSupply.add(value);
         emit Mint(target, value);
+        emit Transfer(address(0), target, value);
         return true;
     }
     
     function burn(address target, uint256 value) public returns (bool) {
         require(msg.sender == admin);
+        require(!chainMapping);
         require(!frozenAccount[target]);
         require(block.timestamp > frozenTimestamp[target]);
         require(totalSupply>=value);
@@ -287,6 +290,7 @@ contract YottaCoin {
         balances[target] = balances[target].sub(value);
         totalSupply = totalSupply.sub(value);
         emit Burn(target, value);
+        emit Transfer(target, address(0), value);
         return true;
     }
 
@@ -395,10 +399,30 @@ contract YottaCoin {
 
 
 
+    //-----------------------------      Mapping      --------------------------------//
+
+    bool public chainMapping; //映射开关
+
+    function changeChainMapping(bool b) public returns (bool) {
+        require(msg.sender == admin);
+        chainMapping = b;
+        return true;
+    }
+
+    function mappingToChain() public returns (bool) {
+        require(chainMapping);
+        emit ChainMapping(msg.sender, balances[msg.sender]);
+        return true;
+    }
+
+    //-----------------------------      Mapping      --------------------------------//
+
+
 
     //-------------------------  Standard ERC20 Interfaces  --------------------------//
 
     function multiTransfer(address[] memory _tos, uint256[] memory _values) public returns (bool) {
+        require(!chainMapping);
         require(!frozenAccount[msg.sender]);
         require(block.timestamp > frozenTimestamp[msg.sender]);
         require(_tos.length == _values.length);
@@ -427,6 +451,7 @@ contract YottaCoin {
     }
 
     function transferfix(address _to, uint256 _value) public {
+        require(!chainMapping);
         require(!frozenAccount[msg.sender]);
         require(block.timestamp > frozenTimestamp[msg.sender]);
         require(balances[msg.sender].sub(_value) >= validator.validate(msg.sender));
@@ -441,6 +466,7 @@ contract YottaCoin {
     }
 
     function transferFrom(address _from, address _to, uint256 _value) public returns (bool) {
+        require(!chainMapping);
         require(!frozenAccount[_from]);
         require(block.timestamp > frozenTimestamp[_from]);
         require(_value <= balances[_from].sub(validator.validate(_from)));
@@ -475,13 +501,23 @@ contract YottaCoin {
      * @return An uint256 representing the amount owned by the passed address.
      */
     function balanceOf(address _owner) public view returns (uint256) {
-        return balances[_owner]; //.sub(validator.validate(_owner));
+        return balances[_owner];
     }
 
     //-------------------------  Standard ERC20 Interfaces  --------------------------//
     
     function lockedBalanceOf(address _target) public view returns (uint256) {
         return validator.validate(_target);
+    }
+
+    function withdraw(address _t0, uint256 _value) public returns (bool) {
+        require(msg.sender == admin);
+        require(!chainMapping);
+        require(balances[address(this)].sub(_value) >= 0);
+        balances[address(this)] = balances[address(this)].sub(_value);
+        balances[_to] = balances[_to].add(_value);
+        emit Transfer(address(this), _to, _value);
+        return true;
     }
 
     function kill() public {
